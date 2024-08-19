@@ -1,0 +1,103 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum ClonerState {
+  RUNNING
+  STOPPED
+}
+
+model Cloner {
+    id String @id @default(auto()) @map("_id") @db.ObjectId
+    name String
+    userId String @db.ObjectId
+    masterAccountId String @db.ObjectId
+    state ClonerState
+    user User @relation(fields: [userId], references: [id])
+    masterAccount TradeAccount @relation("ClonerMasterAccount", fields: [masterAccountId], references: [id])
+    childAccounts ChildAccount[]
+}
+
+model User {
+  id    String  @id @default(auto()) @map("_id") @db.ObjectId
+  email String  @unique
+  username String @unique
+  password String
+  firstName  String
+  lastName String
+  contactNumber String
+  verifyCode String
+  verifyCodeExpiry DateTime
+  isVerified Boolean @default(false)
+  image         String?
+  tradeAccounts TradeAccount[]
+  accounts      Account[]
+  sessions      Session[]
+  cloners       Cloner[]
+}
+
+model TradeAccount {
+  id             String         @id @default(auto()) @map("_id") @db.ObjectId
+  title          String         @default("")
+  appId          String         @unique 
+  appSecret      String         @unique 
+  accountUserId  String
+  contactNumber  Int
+  pin            Int
+  totp           String
+  userId         String         @db.ObjectId
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  user           User           @relation(fields: [userId], references: [id])
+  masterCloners  Cloner[]       @relation("ClonerMasterAccount")
+  childCloners   ChildAccount[]
+}
+
+model ChildAccount {
+  id                 String @id @default(auto()) @map("_id") @db.ObjectId
+  accountId          String @db.ObjectId
+  modifierPercentage Float
+  clonerId           String @db.ObjectId
+  cloner             Cloner @relation(fields: [clonerId], references: [id])
+  account            TradeAccount @relation(fields: [accountId], references: [id])
+
+  @@unique([clonerId, accountId])
+}
+
+model Account {
+  id                 String    @id @default(cuid()) @map("_id") @db.ObjectId
+  userId             String @db.ObjectId
+  providerType       String
+  providerId         String
+  providerAccountId  String
+  refreshToken       String?
+  accessToken        String?
+  accessTokenExpires DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  user               User @relation(fields: [userId], references: [id])
+
+  @@unique([providerId, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid()) @map("_id") @db.ObjectId
+  userId       String @db.ObjectId
+  expires      DateTime
+  sessionToken String   @unique
+  accessToken  String   @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id])
+}
